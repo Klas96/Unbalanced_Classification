@@ -13,34 +13,43 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
+from matplotlib import pyplot as plt
+from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import RandomUnderSampler
 
 
 def load_data():
     """
     Load data from txt file to pandas dataframe
     """
-    train_df = pd.read_csv(".BigData/train_data.csv", sep="\t")
-    test_df = pd.read_csv(".BigData/test_data.csv", sep="\t")
+    train_df = pd.read_csv("train_data.csv", sep="\t")
+    test_df = pd.read_csv("test_data.csv", sep="\t")
     return train_df, test_df
 
 
-def train_predict_feature_importance(models, train_df, test_df):
+def train_predict_feature_importance(models, train_df, test_df, target="Class", name="Unknown"):
     """
     Train and predict for each model and calculate feature importance
     """
-    target = "Class"
 
     for model in models:
-        model.fit(train_df.drop(target), train_df[target])
-        predictions = model.predict(test_df.drop(target))
+        model.fit(train_df.drop([target], axis=1), train_df[target])
+        predictions = model.predict(test_df.drop([target], axis=1))
         accuracy = accuracy_score(test_df[target], predictions)
-        print(f"Accuracy {type(model)}: {accuracy}")
+        print(
+            f"DataSet: {name} Model: {type(model).__name__} Accuracy: {accuracy}")
+        if type(model) == RandomForestClassifier:
+            plt.title("Feature importances" + name)
+            plt.bar(train_df.drop([target], axis=1).columns,
+                    model.feature_importances_, color="r", align="center")
+            plt.xticks(rotation=90)
+            plt.savefig("feature_importances_" + name + ".png")
 
 
 if __name__ == "__main__":
     """
     Compare at least 3 different classification methods in terms of predictive performance. Carefully
-    consider how to deal with the imbalance in the data ­ which performance metrics should you use?
+    consider how to deal with the imbalance in the data ­which performance metrics should you use?
     how should models be trained? should the data be re­balanced and if so how? At the conclusion of
     this task you should be able to say something about relative model performance on the test data.
     """
@@ -56,99 +65,32 @@ if __name__ == "__main__":
     print("Number of each class in test set:")
     print(test_df[target].value_counts())
 
-    rf_classifier = RandomForestClassifier()
-    knn_classifier = KNeighborsClassifier()
-    ada_boost_classifier = AdaBoostClassifier()
+    models = [RandomForestClassifier(),
+              KNeighborsClassifier(),
+              AdaBoostClassifier()]
 
-    rf_classifier.fit(train_df.drop([target], axis=1), train_df[target])
-    knn_classifier.fit(train_df.drop([target], axis=1), train_df[target])
-    ada_boost_classifier.fit(train_df.drop([target], axis=1), train_df[target])
-
-    rf_pred = rf_classifier.predict(test_df.drop([target], axis=1))
-    knn_pred = knn_classifier.predict(test_df.drop([target], axis=1))
-    ada_boost_pred = ada_boost_classifier.predict(
-        test_df.drop([target], axis=1))
-
-    # metrics
-    print("RF Accuracy:", accuracy_score(test_df[target], rf_pred))
-    print("KNN Accuracy:", accuracy_score(test_df[target], knn_pred))
-    print("Ada Boost Accuracy:", accuracy_score(
-        test_df[target], ada_boost_pred))
-
-    from matplotlib import pyplot as plt
-    plt.title("Feature importances Unbalanced")
-    plt.bar(train_df.drop(target, axis=1).columns,
-            rf_classifier.feature_importances_, color="r", align="center")
-    plt.xticks(rotation=90)
-    plt.savefig(".BigData/feature_importances_unbalanced.png")
-
-    # balance the data
-    from imblearn.over_sampling import SMOTE
-    from imblearn.under_sampling import RandomUnderSampler
+    train_predict_feature_importance(
+        models, train_df, test_df, name="unbalanced")
 
     rus = RandomUnderSampler(random_state=42)
 
     train_df_sm, target_df_sm = rus.fit_resample(
         train_df.drop([target], axis=1), train_df[target])
 
-    # train the models
-    rf_classifier.fit(train_df_sm, target_df_sm)
-    knn_classifier.fit(train_df_sm, target_df_sm)
-    ada_boost_classifier.fit(train_df_sm, target_df_sm)
+    train_df_sm = pd.concat((train_df_sm, target_df_sm), axis=1)
 
-    rf_pred = rf_classifier.predict(test_df.drop([target], axis=1))
-    knn_pred = knn_classifier.predict(test_df.drop([target], axis=1))
-    ada_boost_pred = ada_boost_classifier.predict(
-        test_df.drop([target], axis=1))
-
-    # metrics
-    print("RF Accuracy Balanced DOWN:",
-          accuracy_score(test_df[target], rf_pred))
-    print("KNN Accuracy Balanced DOWN:",
-          accuracy_score(test_df[target], knn_pred))
-    print("Ada Boost Accuracy Balanced DOWN:", accuracy_score(
-        test_df[target], ada_boost_pred))
-
-    from matplotlib import pyplot as plt
-    plt.title("Feature importances Down Sampel")
-    plt.bar(train_df.drop(target, axis=1).columns,
-            rf_classifier.feature_importances_, color="r", align="center")
-    plt.xticks(rotation=90)
-    plt.savefig(".BigData/feature_importances_DOWN.png")
+    train_predict_feature_importance(
+        models, train_df_sm, test_df, name="Balanced_upsample")
 
     sm = SMOTE(random_state=42)
 
     train_df_sm, target_df_sm = sm.fit_resample(
         train_df.drop([target], axis=1), train_df[target])
 
-    # train the models
-    rf_classifier.fit(train_df_sm, target_df_sm)
-    knn_classifier.fit(train_df_sm, target_df_sm)
-    ada_boost_classifier.fit(train_df_sm, target_df_sm)
+    train_df_sm = pd.concat((train_df_sm, target_df_sm), axis=1)
 
-    rf_pred = rf_classifier.predict(test_df.drop([target], axis=1))
-    knn_pred = knn_classifier.predict(test_df.drop([target], axis=1))
-    ada_boost_pred = ada_boost_classifier.predict(
-        test_df.drop([target], axis=1))
-
-    from matplotlib import pyplot as plt
-    plt.title("Feature importances Down Sampel")
-    plt.bar(train_df.drop(target, axis=1).columns,
-            rf_classifier.feature_importances_, color="r", align="center")
-    plt.xticks(rotation=90)
-    plt.savefig(".BigData/feature_importances_UP.png")
-
-    # metrics
-    print("RF Accuracy Balanced UP:", accuracy_score(test_df[target], rf_pred))
-    print("KNN Accuracy Balanced UP:",
-          accuracy_score(test_df[target], knn_pred))
-    print("Ada Boost Accuracy Balanced UP:", accuracy_score(
-        test_df[target], ada_boost_pred))
-
-    # Feature importance
-    print(
-        f"RF Feature Importance: {rf_classifier.feature_importances_ > 0.05}")
-
+    train_predict_feature_importance(
+        models, train_df_sm, test_df, name="Balanced_downsample")
     """
     Your next task is to identify important features for prediction. Motivate which methods you choose
     for feature selection. Be careful to evalute how confident you are about the selection of features.
